@@ -1,0 +1,6 @@
+{
+  "domains": {
+    "domain1": "localhost:80",
+    "domain2": "10.26.8.7:80"
+  }
+}

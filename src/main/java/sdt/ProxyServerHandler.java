@@ -29,34 +29,45 @@ public class ProxyServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, final Object msg) throws Exception {
         logger.debug(msg.toString());
-//        if (msg instanceof HttpRequest) {
-//            DefaultHttpRequest request = (DefaultHttpRequest) msg;
-//            logger.debug("url:{}", request.uri());
-//            ctx.close();
-//        ReferenceCountUtil.retain(msg);
-        if (serverChannelFuture == null) {
-            serverChannelFuture = getChannel(new InetSocketAddress("localhost", 80)
-                    , ctx.channel().eventLoop());
-        }
-
-        serverChannelFuture.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) throws Exception {
-                if (future.isSuccess()) {
-//                        DefaultHttpRequest request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
-                    Object request1 = msg;
-                    logger.debug("{}", request1);
-                    future.channel().write(request1);
-                    future.channel().flush();
-                } else {
-                    logger.debug("{}", future.cause());
+        if (msg instanceof HttpRequest) {
+            HttpRequest request = (HttpRequest) msg;
+            final String[] split = request.uri().split("\\?|&");
+            String domain = null;
+            for (String item : split) {
+                if (item.startsWith("domain")) {
+                    domain = item.substring(7);
                 }
             }
-        });
-//        } else {
-
-
-//        }
+            if(serverChannelFuture != null) {
+                ctx.close();
+                logger.debug("serverChannel is already established! channel: {} addr: {}",
+                        serverChannelFuture.channel(), serverChannelFuture.channel().remoteAddress());
+            }
+            if (domain != null) {
+                InetSocketAddress addr = Domains.get(domain);
+                serverChannelFuture = getChannel(addr , ctx.channel().eventLoop());
+            } else {
+                // todo: report error
+                logger.debug("domain not found! url: {}", request.uri());
+                ctx.close();
+            }
+        }
+        if(serverChannelFuture != null) {
+            serverChannelFuture.addListener(new ChannelFutureListener() {
+                @Override
+                public void operationComplete(ChannelFuture future) throws Exception {
+                    if (future.isSuccess()) {
+//              DefaultHttpRequest request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+                        Object request1 = msg;
+                        logger.debug("{}", request1);
+                        future.channel().write(request1);
+                        future.channel().flush();
+                    } else {
+                        logger.debug("{}", future.cause());
+                    }
+                }
+            });
+        }
     }
 
     public ChannelFuture getChannel(SocketAddress addr, EventLoopGroup eventLoopGroup) {
